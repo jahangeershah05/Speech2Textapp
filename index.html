@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-time Speech to Text</title>
+    <!-- Tailwind CSS CDN for easy styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles for the Inter font and overall layout */
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(to right bottom, #6a11cb, #2575fc); /* Modern gradient background */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh; /* Full viewport height */
+            margin: 0;
+            padding: 1.5rem; /* Increased padding for smaller screens */
+            box-sizing: border-box;
+        }
+        .container {
+            background-color: #ffffff;
+            border-radius: 2rem; /* Even more rounded corners */
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2); /* Deeper shadow */
+            padding: 2.5rem; /* Increased padding */
+            max-width: 750px; /* Wider for new controls */
+            width: 100%;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            gap: 2rem; /* More space between elements */
+            animation: fadeIn 0.8s ease-out; /* Fade-in animation */
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .header {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .microphone-icon {
+            width: 60px; /* Larger icon */
+            height: 60px;
+            color: #6a11cb; /* Icon color */
+            transition: color 0.3s ease-in-out, transform 0.3s ease-in-out;
+        }
+
+        .microphone-icon.recording {
+            color: #f44336; /* Red when recording */
+            animation: pulse 1.5s infinite ease-in-out; /* Pulsing animation */
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.05); opacity: 0.8; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .button-group {
+            display: flex;
+            justify-content: center;
+            gap: 1rem; /* Space between buttons within a group */
+            flex-wrap: wrap; /* Allow buttons to wrap on small screens */
+        }
+
+        .button-section {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        button {
+            padding: 0.85rem 2rem; /* Larger padding for buttons */
+            border-radius: 1rem; /* More rounded buttons */
+            font-weight: 700; /* Bold text */
+            transition: all 0.3s ease-in-out;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1); /* Button shadow */
+            text-transform: uppercase; /* Uppercase button text */
+            letter-spacing: 0.05em; /* Slight letter spacing */
+        }
+        button:hover {
+            transform: translateY(-3px); /* More pronounced lift on hover */
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+        }
+        button:active {
+            transform: translateY(0); /* Press effect */
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+
+        .start-button {
+            background: linear-gradient(to right, #28a745, #218838); /* Green gradient */
+            color: white;
+        }
+        .start-button:hover {
+            background: linear-gradient(to right, #218838, #1e7e34);
+        }
+        .stop-button {
+            background: linear-gradient(to right, #dc3545, #c82333); /* Red gradient */
+            color: white;
+        }
+        .stop-button:hover {
+            background: linear-gradient(to right, #c82333, #bd2130);
+        }
+        .reset-button { /* New style for reset button */
+            background: linear-gradient(to right, #6c757d, #5a6268); /* Gray gradient */
+            color: white;
+        }
+        .reset-button:hover {
+            background: linear-gradient(to right, #5a6268, #4e555b);
+        }
+        .tool-button { /* General style for new tool buttons */
+            background: linear-gradient(to right, #007bff, #0056b3); /* Blue gradient */
+            color: white;
+            font-size: 0.9rem; /* Smaller font for tool buttons */
+            padding: 0.6rem 1.2rem;
+        }
+        .tool-button:hover {
+            background: linear-gradient(to right, #0056b3, #004085);
+        }
+
+        .status-message {
+            font-size: 1rem; /* Slightly larger status text */
+            color: #4b5563; /* Darker gray text */
+            min-height: 1.8rem; /* Reserve more space */
+            font-weight: 500;
+        }
+        #transcript {
+            min-height: 200px; /* Taller transcript area */
+            border: 2px solid #e0e7ff; /* Lighter, more subtle border */
+            border-radius: 1rem; /* More rounded */
+            padding: 1.5rem; /* More padding */
+            text-align: left;
+            background-color: #f8fafc; /* Very light background */
+            color: #1f2937; /* Even darker text */
+            overflow-y: auto;
+            line-height: 1.8; /* Increased line height for readability */
+            font-size: 1.1rem; /* Larger font size for transcript */
+            box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.05); /* Inner shadow for depth */
+            outline: none; /* Remove outline on focus for contenteditable */
+        }
+        #transcript span {
+            color: #9ca3af; /* Interim text color */
+            font-style: italic; /* Interim text italic */
+        }
+
+        /* Style for the message box */
+        .message-box {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: #fff;
+            padding: 25px; /* More padding */
+            border-radius: 15px; /* More rounded */
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4); /* Stronger shadow */
+            z-index: 1000;
+            display: none; /* Hidden by default */
+            text-align: center;
+            max-width: 350px; /* Slightly wider */
+            width: 90%;
+            animation: slideIn 0.3s ease-out; /* Slide-in animation */
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translate(-50%, -60%); }
+            to { opacity: 1; transform: translate(-50%, -50%); }
+        }
+
+        .message-box h3 {
+            margin-top: 0;
+            color: #333;
+            font-size: 1.4rem; /* Larger title */
+            margin-bottom: 15px;
+        }
+        .message-box p {
+            margin-bottom: 25px; /* More space */
+            color: #555;
+            font-size: 1rem;
+        }
+        .message-box button {
+            background: linear-gradient(to right, #007bff, #0056b3); /* Blue gradient */
+            color: white;
+            padding: 12px 25px; /* Larger button */
+            border: none;
+            border-radius: 8px; /* Rounded button */
+            cursor: pointer;
+            font-weight: 600;
+        }
+        .message-box button:hover {
+            background: linear-gradient(to right, #0056b3, #004085);
+            transform: translateY(-2px);
+        }
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.6); /* Darker overlay */
+            z-index: 999;
+            display: none; /* Hidden by default */
+        }
+        .trademark {
+            font-size: 0.8rem;
+            color: #6b7280;
+            margin-top: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <!-- Microphone Icon SVG -->
+            <svg id="microphoneIcon" class="microphone-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                <line x1="12" y1="19" x2="12" y2="23"></line>
+                <line x1="8" y1="23" x2="16" y2="23"></line>
+            </svg>
+            <h1 class="text-4xl font-extrabold text-gray-900">Speak & Transcribe</h1>
+            <p class="trademark">@Created By Jahangeer Shah</p> <!-- Added Trademark -->
+            <p class="status-message" id="status">Ready to listen...</p>
+        </div>
+
+        <div class="button-section">
+            <div class="button-group">
+                <button id="startButton" class="start-button">Start Recording</button>
+                <button id="stopButton" class="stop-button" disabled>Stop Recording</button>
+                <button id="resetButton" class="reset-button">Reset</button>
+            </div>
+            <div class="button-group">
+                <button id="boldButton" class="tool-button">Bold</button>
+                <button id="increaseFontButton" class="tool-button">Font +</button>
+                <button id="decreaseFontButton" class="tool-button">Font -</button>
+                <button id="copyButton" class="tool-button">Copy Text</button>
+                <button id="downloadTxtButton" class="tool-button">Download TXT</button>
+                <button id="downloadDocxButton" class="tool-button">Download DOCX</button>
+            </div>
+        </div>
+
+        <!-- Transcript area is now contenteditable -->
+        <div id="transcript" class="text-gray-700" contenteditable="true"></div>
+    </div>
+
+    <!-- Message Box for alerts -->
+    <div class="overlay" id="overlay"></div>
+    <div class="message-box" id="messageBox">
+        <h3 id="messageBoxTitle"></h3>
+        <p id="messageBoxContent"></p>
+        <button id="messageBoxCloseButton">OK</button>
+    </div>
+
+    <script>
+        // Get references to DOM elements
+        const startButton = document.getElementById('startButton');
+        const stopButton = document.getElementById('stopButton');
+        const resetButton = document.getElementById('resetButton');
+        const boldButton = document.getElementById('boldButton');
+        const increaseFontButton = document.getElementById('increaseFontButton');
+        const decreaseFontButton = document.getElementById('decreaseFontButton');
+        const copyButton = document.getElementById('copyButton');
+        const downloadTxtButton = document.getElementById('downloadTxtButton');
+        const downloadDocxButton = document.getElementById('downloadDocxButton');
+        const statusDisplay = document.getElementById('status');
+        const transcriptDisplay = document.getElementById('transcript');
+        const messageBox = document.getElementById('messageBox');
+        const messageBoxTitle = document.getElementById('messageBoxTitle');
+        const messageBoxContent = document.getElementById('messageBoxContent');
+        const messageBoxCloseButton = document.getElementById('messageBoxCloseButton');
+        const overlay = document.getElementById('overlay');
+        const microphoneIcon = document.getElementById('microphoneIcon');
+
+        // Initialize SpeechRecognition object
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        let recognition;
+        let isRecording = false;
+        let lastFinalResultSent = false; // Flag to track if the last result was final
+        let currentFontSize = 1.1; // Initial font size in rem
+
+        // Function to show a custom message box instead of alert()
+        function showMessageBox(title, message) {
+            messageBoxTitle.textContent = title;
+            messageBoxContent.textContent = message;
+            messageBox.style.display = 'block';
+            overlay.style.display = 'block';
+        }
+
+        // Function to hide the custom message box
+        function hideMessageBox() {
+            messageBox.style.display = 'none';
+            overlay.style.display = 'none';
+        }
+
+        // Event listener for the message box close button
+        messageBoxCloseButton.addEventListener('click', hideMessageBox);
+        overlay.addEventListener('click', hideMessageBox); // Close on overlay click too
+
+        // Apply initial font size
+        transcriptDisplay.style.fontSize = currentFontSize + 'rem';
+
+        // Check if the Web Speech API is supported by the browser
+        if (SpeechRecognition) {
+            recognition = new SpeechRecognition();
+            recognition.continuous = true;
+            recognition.interimResults = true;
+            recognition.lang = 'en-US';
+
+            recognition.onresult = (event) => {
+                let interimTranscript = '';
+                let finalTranscript = '';
+
+                for (let i = event.resultIndex; i < event.results.length; ++i) {
+                    const transcript = event.results[i][0].transcript;
+                    if (event.results[i].isFinal) {
+                        finalTranscript += transcript + ' ';
+                        lastFinalResultSent = true;
+                    } else {
+                        interimTranscript += transcript;
+                        lastFinalResultSent = false;
+                    }
+                }
+
+                // Get the current HTML content, excluding any previous interim span
+                let currentContent = transcriptDisplay.innerHTML.replace(/<span style="[^"]*">.*?<\/span>/g, '');
+
+                // If a final transcript is received and there's existing content, add a line break
+                if (finalTranscript && currentContent.trim() !== '' && !currentContent.endsWith('<br>') && !currentContent.endsWith('<br><br>')) {
+                    currentContent += '<br>';
+                }
+
+                // Append the new final transcript
+                currentContent += finalTranscript;
+
+                // Append the new interim transcript
+                if (interimTranscript) {
+                    currentContent += '<span style="color:#9ca3af; font-style:italic;">' + interimTranscript + '</span>';
+                }
+
+                transcriptDisplay.innerHTML = currentContent;
+                // Scroll to the bottom to always show the latest text
+                transcriptDisplay.scrollTop = transcriptDisplay.scrollHeight;
+            };
+
+            recognition.onerror = (event) => {
+                isRecording = false;
+                startButton.disabled = false;
+                stopButton.disabled = true;
+                microphoneIcon.classList.remove('recording'); // Remove recording animation
+                statusDisplay.textContent = 'Error: ' + event.error;
+                console.error('Speech recognition error:', event.error);
+
+                if (event.error === 'not-allowed') {
+                    showMessageBox('Microphone Access Denied', 'Please allow microphone access in your browser settings to use speech recognition.');
+                } else if (event.error === 'no-speech') {
+                    statusDisplay.textContent = 'No speech detected. Please try again.';
+                } else if (event.error === 'network') {
+                    showMessageBox('Network Error', 'A network error occurred. Please check your internet connection.');
+                }
+            };
+
+            recognition.onend = () => {
+                // If recognition stops but we are still in recording state (continuous mode), restart it.
+                if (isRecording) {
+                    // If the last thing spoken was a final result, add a new line before restarting
+                    if (lastFinalResultSent && transcriptDisplay.innerHTML.trim() !== '' && !transcriptDisplay.innerHTML.endsWith('<br>') && !transcriptDisplay.innerHTML.endsWith('<br><br>')) {
+                        transcriptDisplay.innerHTML += '<br><br>';
+                    }
+                    recognition.start();
+                    statusDisplay.textContent = 'Listening... (restarted)';
+                } else {
+                    // If recording was explicitly stopped or ended naturally, update status and icon.
+                    statusDisplay.textContent = 'Recording stopped.';
+                    microphoneIcon.classList.remove('recording'); // Ensure animation stops
+                }
+                lastFinalResultSent = false; // Reset for next segment
+            };
+
+            startButton.addEventListener('click', () => {
+                if (!isRecording) {
+                    try {
+                        // Add a new line if there's existing content in the transcript
+                        if (transcriptDisplay.textContent.trim() !== '') {
+                            transcriptDisplay.innerHTML += '<br><br>'; // Add two breaks for better visual separation
+                        }
+                        recognition.start();
+                        isRecording = true;
+                        startButton.disabled = true;
+                        stopButton.disabled = false;
+                        microphoneIcon.classList.add('recording'); // Add recording animation
+                        statusDisplay.textContent = 'Listening... Speak now.';
+                    } catch (e) {
+                        console.error('Error starting recognition:', e);
+                        statusDisplay.textContent = 'Could not start recognition. Is microphone available?';
+                        showMessageBox('Error', 'Could not start speech recognition. Please ensure your microphone is connected and accessible.');
+                    }
+                }
+            });
+
+            stopButton.addEventListener('click', () => {
+                if (isRecording) {
+                    recognition.stop();
+                    isRecording = false;
+                    startButton.disabled = false;
+                    stopButton.disabled = true;
+                    microphoneIcon.classList.remove('recording'); // Remove recording animation
+                    statusDisplay.textContent = 'Recording stopped.';
+                }
+            });
+
+            // Event listener for the Reset button
+            resetButton.addEventListener('click', () => {
+                if (isRecording) {
+                    recognition.stop(); // Stop ongoing recognition if any
+                }
+                isRecording = false; // Ensure recording state is false
+                transcriptDisplay.textContent = ''; // Clear the transcript
+                statusDisplay.textContent = 'Ready to listen...'; // Reset status message
+                startButton.disabled = false; // Enable start button
+                stopButton.disabled = true; // Disable stop button
+                microphoneIcon.classList.remove('recording'); // Stop microphone animation
+                lastFinalResultSent = false; // Reset flag
+            });
+
+            // Event listener for Bold button
+            boldButton.addEventListener('click', () => {
+                document.execCommand('bold', false, null);
+                transcriptDisplay.focus(); // Keep focus on the editable area
+            });
+
+            // Event listener for Increase Font button
+            increaseFontButton.addEventListener('click', () => {
+                currentFontSize += 0.1; // Increase by 0.1rem
+                transcriptDisplay.style.fontSize = currentFontSize + 'rem';
+                transcriptDisplay.focus();
+            });
+
+            // Event listener for Decrease Font button
+            decreaseFontButton.addEventListener('click', () => {
+                if (currentFontSize > 0.5) { // Prevent font size from becoming too small
+                    currentFontSize -= 0.1; // Decrease by 0.1rem
+                    transcriptDisplay.style.fontSize = currentFontSize + 'rem';
+                }
+                transcriptDisplay.focus();
+            });
+
+            // Event listener for Copy Text button
+            copyButton.addEventListener('click', () => {
+                try {
+                    const textToCopy = transcriptDisplay.textContent;
+                    const tempTextArea = document.createElement('textarea');
+                    tempTextArea.value = textToCopy;
+                    document.body.appendChild(tempTextArea);
+                    tempTextArea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(tempTextArea);
+                    showMessageBox('Copied!', 'Text copied to clipboard.');
+                } catch (err) {
+                    console.error('Failed to copy text: ', err);
+                    showMessageBox('Error', 'Failed to copy text. Please try again or copy manually.');
+                }
+            });
+
+            // Event listener for Download TXT button
+            downloadTxtButton.addEventListener('click', () => {
+                const textContent = transcriptDisplay.textContent;
+                const blob = new Blob([textContent], { type: 'text/plain;charset=utf-8' });
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = 'transcript.txt';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            });
+
+            // Event listener for Download DOCX button (generates HTML which Word can often open)
+            downloadDocxButton.addEventListener('click', () => {
+                // Get the HTML content from the editable div
+                const htmlContent = transcriptDisplay.innerHTML;
+
+                // Create a full HTML document structure for better compatibility with Word
+                const fullHtml = `
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <meta charset="UTF-8">
+                        <title>Transcript</title>
+                        <style>
+                            body { font-family: 'Inter', sans-serif; line-height: 1.8; font-size: ${currentFontSize}rem; }
+                            strong { font-weight: bold; }
+                            em { font-style: italic; }
+                        </style>
+                    </head>
+                    <body>
+                        ${htmlContent}
+                    </body>
+                    </html>
+                `;
+
+                const blob = new Blob([fullHtml], { type: 'application/msword' }); // Or 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' for true docx, but needs complex lib
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = 'transcript.docx'; // Suggest .docx extension
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                showMessageBox('Download Initiated', 'Attempting to download as DOCX. Microsoft Word can usually open this HTML file.');
+            });
+
+
+        } else {
+            statusDisplay.textContent = 'Web Speech API is not supported by this browser. Please use Chrome or Edge.';
+            startButton.disabled = true;
+            stopButton.disabled = true;
+            showMessageBox('Browser Not Supported', 'Your browser does not support the Web Speech API. Please try using Google Chrome or Microsoft Edge for this application.');
+        }
+    </script>
+</body>
+</html>
